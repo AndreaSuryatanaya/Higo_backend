@@ -39,29 +39,39 @@ router.get("/statistics/summary", async (req, res) => {
                 $group: {
                     _id: null,
                     uniqueByCustomerId: { $addToSet: "$customerId" },
+                    uniqueByEmail: { $addToSet: "$email" },
+                    uniqueByName: { $addToSet: "$fullName" },
+                    uniqueByNameAndEmail: { $addToSet: { fullName: "$fullName", email: "$email" } },
                 },
             },
             {
                 $project: {
                     _id: 0,
                     uniqueCustomersByCustomerId: { $size: "$uniqueByCustomerId" },
+                    uniqueByEmail: { $size: "$uniqueByEmail" },
+                    uniqueByName: { $size: "$uniqueByName" },
+                    uniqueByNameAndEmail: { $size: "$uniqueByNameAndEmail" },
                 },
             },
         ]);
 
-        // Calculate age from birthYear using unique customers only (by customerId)
+        // Calculate age from birthYear using unique customers (by email only)
         const currentYear = new Date().getFullYear();
 
         const summaryStats = await Customer.aggregate([
-            // First, get unique customers by customerId
+            // First, get unique customers by email only
             {
                 $group: {
-                    _id: "$customerId",
+                    _id: "$email",
+                    customerId: { $first: "$customerId" },
                     fullName: { $first: "$fullName" },
                     birthYear: { $first: "$birthYear" },
                     gender: { $first: "$gender" },
-                    email: { $first: "$email" },
-                    // Keep first occurrence of each unique customer
+                    phone: { $first: "$phone" },
+                    device: { $first: "$device" },
+                    digitalInterest: { $first: "$digitalInterest" },
+                    locationType: { $first: "$locationType" },
+                    // Keep first occurrence of each unique customer (by email)
                 },
             },
             {
@@ -83,10 +93,10 @@ router.get("/statistics/summary", async (req, res) => {
         ]);
 
         const genderStats = await Customer.aggregate([
-            // Group by customerId first to get unique customers
+            // Group by email first to get truly unique customers
             {
                 $group: {
-                    _id: "$customerId",
+                    _id: "$email",
                     gender: { $first: "$gender" },
                 },
             },
@@ -107,13 +117,16 @@ router.get("/statistics/summary", async (req, res) => {
         });
 
         res.json({
-            // Multiple customer count metrics
+            // Multiple customer count metrics for analysis
             customerCounts: {
                 totalRecords: totalRecords,
                 uniqueByCustomerId: uniqueData?.uniqueCustomersByCustomerId || 0,
+                uniqueByEmail: uniqueData?.uniqueByEmail || 0, // Primary metric - most accurate
+                uniqueByName: uniqueData?.uniqueByName || 0,
+                uniqueByNameAndEmail: uniqueData?.uniqueByNameAndEmail || 0,
             },
-            // Use unique customers by customerId as the primary count
-            totalCustomers: uniqueData?.uniqueCustomersByCustomerId || 0,
+            // Use unique by email as the primary count (most accurate for registered users)
+            totalCustomers: uniqueData?.uniqueByEmail || 0,
             demographics: {
                 age: {
                     average: Math.round((stats?.avgAge || 0) * 10) / 10,
@@ -127,9 +140,9 @@ router.get("/statistics/summary", async (req, res) => {
                 },
                 gender: genderBreakdown,
             },
-            digitalInterests: await getDigitalInterestStats(),
-            devices: await getDeviceStats(),
-            locationTypes: await getLocationTypeStats(),
+            digitalInterests: await getDigitalInterestStatsUniqueByEmail(),
+            devices: await getDeviceStatsUniqueByEmail(),
+            locationTypes: await getLocationTypeStatsUniqueByEmail(),
         });
     } catch (error) {
         console.error("❌ Error in /statistics/summary:", error);
@@ -141,6 +154,14 @@ router.get("/statistics/summary", async (req, res) => {
 router.get("/statistics/gender", async (req, res) => {
     try {
         const result = await Customer.aggregate([
+            // First get unique customers by email only (consistent with other endpoints)
+            {
+                $group: {
+                    _id: "$email",
+                    gender: { $first: "$gender" },
+                },
+            },
+            // Then group by gender
             {
                 $group: {
                     _id: "$gender",
@@ -168,11 +189,18 @@ router.get("/statistics/gender", async (req, res) => {
     }
 });
 
-// Helper functions for additional statistics
-async function getDigitalInterestStats() {
+async function getDigitalInterestStatsUniqueByEmail() {
     try {
         const result = await Customer.aggregate([
             { $match: { digitalInterest: { $ne: null, $ne: "" } } },
+            // First get unique customers by email only
+            {
+                $group: {
+                    _id: "$email",
+                    digitalInterest: { $first: "$digitalInterest" },
+                },
+            },
+            // Then group by digital interest
             { $group: { _id: "$digitalInterest", count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $project: { _id: 0, interest: "$_id", count: 1 } },
@@ -184,10 +212,18 @@ async function getDigitalInterestStats() {
     }
 }
 
-async function getDeviceStats() {
+async function getDeviceStatsUniqueByEmail() {
     try {
         const result = await Customer.aggregate([
             { $match: { device: { $ne: null, $ne: "" } } },
+            // First get unique customers by email only
+            {
+                $group: {
+                    _id: "$email",
+                    device: { $first: "$device" },
+                },
+            },
+            // Then group by device
             { $group: { _id: "$device", count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $project: { _id: 0, device: "$_id", count: 1 } },
@@ -199,10 +235,18 @@ async function getDeviceStats() {
     }
 }
 
-async function getLocationTypeStats() {
+async function getLocationTypeStatsUniqueByEmail() {
     try {
         const result = await Customer.aggregate([
             { $match: { locationType: { $ne: null, $ne: "" } } },
+            // First get unique customers by email only
+            {
+                $group: {
+                    _id: "$email",
+                    locationType: { $first: "$locationType" },
+                },
+            },
+            // Then group by location type
             { $group: { _id: "$locationType", count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $project: { _id: 0, locationType: "$_id", count: 1 } },
