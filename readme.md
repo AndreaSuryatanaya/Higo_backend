@@ -76,7 +76,13 @@ Then, move the Dataset.csv file to the root folder of the application, as shown 
 Then, run the seed.js file:
 
 ```
-node seed.js
+node --max-old-space-size=4096 seed.js
+```
+
+if you have an error for seeding data, you can up to 6144 or 8192 (if your RAM is bigger) :
+
+```
+node --max-old-space-size=8192 seed.js
 ```
 
 Wait for the seeding process to complete, then check the MongoDB database when the seeding process is complete.
