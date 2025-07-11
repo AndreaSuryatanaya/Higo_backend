@@ -251,26 +251,6 @@ All analytics endpoints use **email as the primary unique identifier** to ensure
 -   Provides the most accurate representation of unique customers
 -   Maintains consistency across all analytics endpoints
 
-### MongoDB Aggregation Pipeline
-
-The API uses MongoDB's aggregation pipeline for efficient data processing:
-
--   **Two-stage grouping**: First by email (deduplication), then by the target field
--   **Memory efficient**: Processes data in streams rather than loading all into memory
--   **Index optimization**: Ensure proper indexing on `email` field for best performance
-
-### Recommended Indexes
-
-```javascript
-// Recommended MongoDB indexes for optimal performance
-db.customers.createIndex({ email: 1 });
-db.customers.createIndex({ customerId: 1 });
-db.customers.createIndex({ gender: 1, email: 1 });
-db.customers.createIndex({ device: 1, email: 1 });
-db.customers.createIndex({ digitalInterest: 1, email: 1 });
-db.customers.createIndex({ locationType: 1, email: 1 });
-```
-
 ### Large Dataset Handling
 
 -   **Pagination**: Implemented for customer listing to handle large datasets
